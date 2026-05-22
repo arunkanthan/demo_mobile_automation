@@ -1,0 +1,7 @@
+{
+  "app_name": "Demo Mobile App",
+  "app_version": "1.0.0",
+  "test_environment": "staging",
+  "timeout_seconds": 30,
+  "screenshot_on_failure": true
+}
