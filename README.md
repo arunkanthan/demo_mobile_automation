@@ -68,11 +68,12 @@ iOS_DEVICE_NAME=iPhone 15
 iOS_UDID=00008120-001234567890ABCD
 
 # Android Configuration (example)
-ANDROID_APP_PATH=/path/to/your/app.apk
+ANDROID_APP_PATH=/Users/armac/Desktop/*.apk
 ANDROID_APP_PACKAGE=com.example.app
 ANDROID_APP_ACTIVITY=.MainActivity
 ```
-
+> Note: On Apple Silicon hosts, use ARM Android emulator images such as `system-images;android-33;google_apis_playstore;arm64-v8a`.
+> The `x86_64` emulator images are not supported by the QEMU2 emulator on aarch64 hosts.
 ### 4. Start Appium Server
 
 ```bash

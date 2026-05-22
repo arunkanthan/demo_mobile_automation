@@ -22,10 +22,13 @@ export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platfo
 
 # accept licenses and install components
 sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses
-sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis_playstore;arm64-v8a"
 
 # create an AVD
-avdmanager create avd -n test_avd -k "system-images;android-33;google_apis;x86_64" --device "pixel"
+avdmanager create avd -n test_avd -k "system-images;android-33;google_apis_playstore;arm64-v8a" --device "pixel"
+
+# On Apple Silicon, use ARM images instead of x86_64
+# For Intel macOS or CI with x86_64 emulator support, use the x86_64 images instead.
 
 # start emulator
 $ANDROID_SDK_ROOT/emulator/emulator -avd test_avd &

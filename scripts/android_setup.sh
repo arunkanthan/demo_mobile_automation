@@ -33,25 +33,47 @@ command -v sdkmanager >/dev/null 2>&1 || { echo >&2 "sdkmanager not found. Insta
 echo "Accepting Android licenses..."
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
 
-echo "Installing platform-tools and emulator (if missing)..."
-sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "emulator" "platforms;android-33" || true
+echo "Installing command-line tools, platform-tools, and emulator (if missing)..."
+sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "cmdline-tools;latest" "platform-tools" "emulator" "platforms;android-33" || true
+
+# Ensure SDK command-line tool binaries are first in PATH
+export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
+
+if ! command -v avdmanager >/dev/null 2>&1; then
+  echo >&2 "avdmanager not found after installing command-line tools. Check that cmdline-tools are installed under $ANDROID_SDK_ROOT/cmdline-tools/latest/bin."
+  exit 1
+fi
 
 # System image selection: allow user to pass a system image as second arg
 # Example image id: system-images;android-33;google_apis;x86_64
 REQUESTED_IMAGE=${2:-}
 
-# Default candidate list (tries in order)
-CANDIDATES=(
-  "${REQUESTED_IMAGE}"
-  "system-images;android-33;google_apis;x86_64"
-  "system-images;android-33;default;x86_64"
-  "system-images;android-31;google_apis;x86_64"
-  "system-images;android-30;default;x86"
-)
+HOST_ARCH=$(uname -m)
+echo "Detected host architecture: $HOST_ARCH"
 
-# If no requested image provided, remove empty first entry
-if [ -z "$REQUESTED_IMAGE" ]; then
-  CANDIDATES=(${CANDIDATES[@]:1})
+case "$HOST_ARCH" in
+  arm64|aarch64)
+    DEFAULT_IMAGES=(
+      "system-images;android-33;google_apis_playstore;arm64-v8a"
+      "system-images;android-33;google_apis;arm64-v8a"
+      "system-images;android-33;default;arm64-v8a"
+      "system-images;android-31;google_apis;arm64-v8a"
+    )
+    ;;
+  *)
+    DEFAULT_IMAGES=(
+      "system-images;android-33;google_apis;x86_64"
+      "system-images;android-33;default;x86_64"
+      "system-images;android-31;google_apis;x86_64"
+      "system-images;android-30;default;x86"
+    )
+    ;;
+esac
+
+if [ -n "$REQUESTED_IMAGE" ]; then
+  CANDIDATES=("$REQUESTED_IMAGE" "${DEFAULT_IMAGES[@]}")
+else
+  CANDIDATES=("${DEFAULT_IMAGES[@]}")
 fi
 
 SELECTED_IMAGE=""
