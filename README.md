@@ -71,13 +71,19 @@ iOS_UDID=00008120-001234567890ABCD
 ANDROID_APP_PATH=/Users/armac/Desktop/*.apk
 ANDROID_APP_PACKAGE=com.example.app
 ANDROID_APP_ACTIVITY=.MainActivity
+ANDROID_HOME=/path/to/Android/Sdk
+ANDROID_SDK_ROOT=/path/to/Android/Sdk
 ```
 > Note: On Apple Silicon hosts, use ARM Android emulator images such as `system-images;android-33;google_apis_playstore;arm64-v8a`.
 > The `x86_64` emulator images are not supported by the QEMU2 emulator on aarch64 hosts.
+
+> Important: If Appium is started separately, export `ANDROID_HOME` / `ANDROID_SDK_ROOT` in the shell before launching Appium.
+
 ### 4. Start Appium Server
 
 ```bash
 # Start Appium server (opens on port 4723 by default)
+source .env
 appium
 ```
 
@@ -103,10 +109,10 @@ pytest --platform=android
 pytest -m smoke
 
 # Run iOS specific tests
-pytest -m ios
+pytest --platform=ios -m ios
 
 # Run Android specific tests
-pytest -m android
+pytest --platform=android -m android
 ```
 
 #### Run with detailed reporting
