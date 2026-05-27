@@ -22,8 +22,8 @@ def ios_capabilities():
         "wdaConnectionTimeout": 60000,
         "newCommandTimeout": 60,
     }
-    # Remove None values
-    return {k: v for k, v in caps.items() if v is not None}
+    # Remove None or empty string values
+    return {k: v for k, v in caps.items() if v not in (None, "")}
 
 
 def android_capabilities():
@@ -43,5 +43,5 @@ def android_capabilities():
         "connectHardwareKeyboard": False,
         "autoWebview": False,
     }
-    # Remove None values
-    return {k: v for k, v in caps.items() if v is not None}
+    # Remove None or empty string values
+    return {k: v for k, v in caps.items() if v not in (None, "")}

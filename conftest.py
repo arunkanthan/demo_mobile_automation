@@ -32,6 +32,11 @@ def is_app_installed_android(app_package):
         else:
             adb_path = "adb"
         
+        # Verify adb exists
+        if not os.path.exists(adb_path) and android_sdk_root:
+            print(f"Warning: adb not found at {adb_path}, falling back to system adb")
+            adb_path = "adb"
+        
         result = subprocess.run(
             [adb_path, "shell", "pm", "list", "packages"],
             capture_output=True,
@@ -57,6 +62,9 @@ def ensure_emulator_running(timeout: int = 120) -> bool:
         else:
             adb_path = "adb"
             emulator_bin = "emulator"
+
+        print(f"DEBUG: Using adb from: {adb_path}")
+        print(f"DEBUG: adb exists: {os.path.exists(adb_path)}")
 
         # Check for connected devices
         result = subprocess.run([adb_path, "devices"], capture_output=True, text=True, timeout=10)
@@ -103,11 +111,19 @@ def install_app_android(app_path):
     try:
         # Find adb from SDK or PATH
         android_sdk_root = os.getenv("ANDROID_SDK_ROOT") or os.getenv("ANDROID_HOME")
+        adb_path = "adb"
         if android_sdk_root:
-            adb_path = os.path.join(android_sdk_root, "platform-tools", "adb")
-        else:
-            adb_path = "adb"
-        
+            candidate = os.path.join(android_sdk_root, "platform-tools", "adb")
+            if os.path.exists(candidate):
+                adb_path = candidate
+            else:
+                print(f"Warning: adb not found at {candidate}, falling back to system adb")
+
+        if not os.path.exists(app_path):
+            print(f"ERROR: App file not found: {app_path}")
+            return False
+
+        print(f"Using adb: {adb_path}")
         print(f"Installing app from {app_path}...")
         result = subprocess.run(
             [adb_path, "install", "-r", app_path],
@@ -135,11 +151,15 @@ def uninstall_app_android(app_package):
     try:
         # Find adb from SDK or PATH
         android_sdk_root = os.getenv("ANDROID_SDK_ROOT") or os.getenv("ANDROID_HOME")
+        adb_path = "adb"
         if android_sdk_root:
-            adb_path = os.path.join(android_sdk_root, "platform-tools", "adb")
-        else:
-            adb_path = "adb"
+            candidate = os.path.join(android_sdk_root, "platform-tools", "adb")
+            if os.path.exists(candidate):
+                adb_path = candidate
+            else:
+                print(f"Warning: adb not found at {candidate}, falling back to system adb")
         
+        print(f"Using adb: {adb_path}")
         print(f"Uninstalling app {app_package}...")
         result = subprocess.run(
             [adb_path, "uninstall", app_package],
@@ -169,6 +189,26 @@ def driver(request):
         caps = ios_capabilities()
     else:
         caps = android_capabilities()
+
+    # Validate required capabilities
+    if platform == "android":
+        missing_caps = []
+        if not caps.get('app'):
+            missing_caps.append("ANDROID_APP_PATH")
+
+        if missing_caps:
+            print(f"\n{'='*60}")
+            print(f"ERROR: Missing Android capabilities!")
+            print(f"Please configure in .env file:")
+            for cap in missing_caps:
+                print(f"  - {cap}")
+            print(f"{'='*60}\n")
+            raise ValueError(f"Missing required capabilities: {', '.join(missing_caps)}")
+
+        if not caps.get('appPackage'):
+            print(f"WARNING: ANDROID_APP_PACKAGE is not set. Appium will try to install and launch the APK from ANDROID_APP_PATH.")
+        if not caps.get('appActivity'):
+            print(f"WARNING: ANDROID_APP_ACTIVITY is not set. Appium may still launch the app if ANDROID_APP_PATH is provided.")
 
     # Ensure an emulator/device is running before creating the Appium session
     if platform == "android":
@@ -216,25 +256,37 @@ def driver(request):
             app_path = caps.get('app')
             app_pkg = caps.get('appPackage')
             
-            if app_path and app_pkg:
+            if app_path:
                 print(f"\n{'='*60}")
                 print(f"Checking Android app installation...")
+                print(f"App Path: {app_path}")
+                print(f"App Package: {app_pkg or 'NOT SET'}")
                 print(f"{'='*60}\n")
                 # Ensure emulator/device is running before checking/installing
                 if not ensure_emulator_running():
                     print("Warning: No emulator/device available; continuing and letting Appium handle device startup")
 
-                if not is_app_installed_android(app_pkg):
-                    print(f"App {app_pkg} not installed. Installing...")
+                if app_pkg:
+                    if not is_app_installed_android(app_pkg):
+                        print(f"App {app_pkg} not installed. Installing...")
+                        if os.path.exists(app_path):
+                            if install_app_android(app_path):
+                                print(f"Successfully installed {app_pkg}")
+                            else:
+                                print(f"Failed to install {app_pkg}")
+                        else:
+                            print(f"App file not found: {app_path}")
+                    else:
+                        print(f"App {app_pkg} is already installed")
+                else:
+                    print("ANDROID_APP_PACKAGE is not set; installing APK directly from path")
                     if os.path.exists(app_path):
                         if install_app_android(app_path):
-                            print(f"Successfully installed {app_pkg}")
+                            print("APK installed directly from ANDROID_APP_PATH")
                         else:
-                            print(f"Failed to install {app_pkg}")
+                            print("Failed to install APK from ANDROID_APP_PATH")
                     else:
                         print(f"App file not found: {app_path}")
-                else:
-                    print(f"App {app_pkg} is already installed")
         
         # Launch the app explicitly
         print(f"\n{'='*60}")
@@ -243,25 +295,38 @@ def driver(request):
         
         try:
             if platform == "android":
-                # For Android, try multiple approaches to get the app running
                 app_pkg_val = caps.get('appPackage')
-                if app_pkg_val:
+                app_activity = caps.get('appActivity')
+
+                if app_pkg_val and app_activity:
                     try:
-                        # Try to activate the already-installed app
+                        driver.execute_script(
+                            "mobile: startActivity",
+                            {"appPackage": app_pkg_val, "appActivity": app_activity}
+                        )
+                        print(f"Started activity {app_activity} for {app_pkg_val}")
+                    except Exception as e:
+                        print(f"Could not start activity {app_activity} for {app_pkg_val}: {e}")
+                        print("Falling back to activate_app()")
+                        try:
+                            driver.activate_app(app_pkg_val)
+                            print(f"App {app_pkg_val} activated")
+                        except Exception as e2:
+                            print(f"Could not activate app {app_pkg_val}: {e2}")
+                elif app_pkg_val:
+                    try:
                         driver.activate_app(app_pkg_val)
                         print(f"App {app_pkg_val} activated")
                     except Exception as e:
-                        print(f"Could not activate app with package name: {e}")
-                        print("Attempting alternative launch method...")
-                        # App should be running from driver initialization if it was specified
-                        # or manually installed. Log this for reference.
+                        print(f"Could not activate app {app_pkg_val}: {e}")
+                else:
+                    print("ANDROID_APP_PACKAGE not set; cannot start Android app explicitly")
             else:
-                # For iOS, use launch_app if needed
                 try:
-                    driver.launch_app()
-                    print(f"{platform.upper()} app launched")
+                    driver.execute_script("mobile: launchApp", {})
+                    print(f"{platform.upper()} app launched via mobile: launchApp")
                 except Exception as e:
-                    print(f"No explicit launch needed (app may be running): {e}")
+                    print(f"Could not launch iOS app with mobile: launchApp: {e}")
         except Exception as e:
             print(f"App launch encountered an issue: {e}")
             # Don't fail the test setup - continue with what we have
