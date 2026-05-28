@@ -304,6 +304,10 @@ def driver(request):
                             "mobile: startActivity",
                             {"appPackage": app_pkg_val, "appActivity": app_activity}
                         )
+                        driver.execute_script(
+                            "mobile: startActivity",
+                            {"appPackage": app_pkg_val, "appActivity": app_activity}
+                        )
                         print(f"Started activity {app_activity} for {app_pkg_val}")
                     except Exception as e:
                         print(f"Could not start activity {app_activity} for {app_pkg_val}: {e}")
@@ -315,6 +319,7 @@ def driver(request):
                             print(f"Could not activate app {app_pkg_val}: {e2}")
                 elif app_pkg_val:
                     try:
+                        driver.activate_app(app_pkg_val)
                         driver.activate_app(app_pkg_val)
                         print(f"App {app_pkg_val} activated")
                     except Exception as e:
